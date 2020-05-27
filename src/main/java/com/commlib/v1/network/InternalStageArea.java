@@ -34,6 +34,7 @@ public class InternalStageArea extends StagingArea {
                 queue.forEach(bytes -> {
                     while (!threadFactory.getThread().invoke(this, bytes)) ;
                 });
+                queue.clear();
             }
 
         });

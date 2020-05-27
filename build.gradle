@@ -1,7 +1,8 @@
 plugins {
+//    id 'org.jlibetbrains.gradle.plugin.idea-ext' version '0.5'
     id 'java-library'
     id 'idea'
-    id "org.jetbrains.gradle.plugin.idea-ext" version "0.5"
+    id 'maven-publish'
 }
 
 group = 'com.commlib'
@@ -11,16 +12,33 @@ targetCompatibility = '11'
 
 repositories {
     mavenCentral()
+    maven {
+        def repoUrl = "${buildDir}/repos"
+        url = version.endsWith('SNAPSHOT') ? "${repoUrl}/snapshots" : "${repoUrl}/releases"
+    }
 }
+//
+//idea {
+//    project {
+//        settings {
+//            ipr.withXml { xmlFile ->
+//                xmlFile.asNode().component.find { it.@name == 'ProjectRootManager' }['output'][0].replaceNode {
+//                    output(url: "file://\$PROJECT_DIR\$/build")
+//                }
+//            }
+//        }
+//    }
+//}
 
-idea {
-    project {
-        settings {
-            ipr.withXml { xmlFile ->
-                xmlFile.asNode().component.find { it.@name == 'ProjectRootManager' }['output'][0].replaceNode {
-                    output(url: "file://\$PROJECT_DIR\$/build")
-                }
-            }
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = "${group}"
+            artifactId = "commlib"
+            version = "${version}"
+
+            from components.java
         }
     }
 }

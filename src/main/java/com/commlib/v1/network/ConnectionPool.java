@@ -12,13 +12,17 @@ public class ConnectionPool {
     private final Map<String, Set<TCPConnection>> uniqueIDConnectionPool = new HashMap<>();
 
     public void submitConn(TCPConnection connection) {
-        hashConnectionMap.put(connection.hashCode(), connection);
+        synchronized (hashConnectionMap) {
+            hashConnectionMap.put(connection.hashCode(), connection);
+        }
     }
 
     public void submitConn(String uniqueID, TCPConnection connection) {
         if (uniqueID != null && !uniqueID.isEmpty()) {
-            Set<TCPConnection> set = uniqueIDConnectionPool.computeIfAbsent(uniqueID, k -> new HashSet<>());
-            set.add(connection);
+            synchronized (uniqueIDConnectionPool) {
+                Set<TCPConnection> set = uniqueIDConnectionPool.computeIfAbsent(uniqueID, k -> new HashSet<>());
+                set.add(connection);
+            }
         }
     }
 
