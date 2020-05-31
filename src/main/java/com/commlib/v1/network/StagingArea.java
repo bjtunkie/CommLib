@@ -1,17 +1,18 @@
 package com.commlib.v1.network;
 
-import com.commlib.v1.network.ConnectionPool;
 import com.commlib.v1.network.utils.Util;
 
 import java.util.concurrent.BlockingQueue;
 
 public abstract class StagingArea {
-    public final ConnectionPool connectionPool;
-    public final Util utils;
+    protected final ConnectionPool connectionPool;
+    protected final RequestPool requestPool;
+    protected final Util utils;
 
-    public StagingArea(ConnectionPool connectionPool, Util utils) {
+    public StagingArea(ConnectionPool connectionPool, RequestPool requestPool, Util utils) {
         this.connectionPool = connectionPool;
         this.utils = utils;
+        this.requestPool = requestPool;
 
     }
 

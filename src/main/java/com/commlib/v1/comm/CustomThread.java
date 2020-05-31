@@ -3,10 +3,7 @@ package com.commlib.v1.comm;
 import com.commlib.v1.exception.UniqueIDAlreadyExistsException;
 import com.commlib.v1.log.Log;
 import com.commlib.v1.log.LogFactory;
-import com.commlib.v1.network.ConnectionPool;
-import com.commlib.v1.network.StagingArea;
-import com.commlib.v1.network.TCPConnection;
-import com.commlib.v1.network.TransmitCode;
+import com.commlib.v1.network.*;
 import com.commlib.v1.network.utils.Util;
 
 import java.io.ByteArrayInputStream;
@@ -21,16 +18,18 @@ public abstract class CustomThread extends Thread implements Releasable {
     private static final Set<Integer> hashCodes = new HashSet<>();
     private final int hashCode;
     private final CustomThreadFactory factory;
+    private final RequestPool requestPool;
     private final Object lock = new Object();
 
 
-    public CustomThread(int hash, CustomThreadFactory factory) {
+    public CustomThread(int hash, RequestPool requestPool, CustomThreadFactory factory) {
         super("CustomThread-" + hash);
         if (hashCodes.contains(hash)) throw new UniqueIDAlreadyExistsException();
         else hashCodes.add(hash);
 
         this.hashCode = hash;
         this.factory = factory;
+        this.requestPool = requestPool == null ? RequestPool.defaultRequestPool : requestPool;
     }
 
     private int transmitCode;
@@ -61,17 +60,17 @@ public abstract class CustomThread extends Thread implements Releasable {
     public final void run() {
         while (true) {
 
-            while (true) {
-                synchronized (lock) {
+            synchronized (lock) {
+                if (transmitCode == Integer.MIN_VALUE) {
                     try {
-                        lock.wait(10000);
+                        lock.wait();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                         log.info("lock.wait() for thread %s was interrupted as new data is available.", getName());
-                        break;
                     }
                 }
             }
+
             int lengthOfData = ((data[20] & 0xFF) << 24) | ((data[21] & 0xFF) << 16) | ((data[22] & 0xFF) << 8) | ((data[23] & 0xFF));
             int hashCodeOfConnection = Util.byteArrayToInt(data, lengthOfData + 24);
             BaseInfo baseInfo = null;
@@ -116,7 +115,8 @@ public abstract class CustomThread extends Thread implements Releasable {
                     TCPConnection connection = connectionPool.findConnectionBasedOn(hashCodeOfConnection);
                     connectionPool.submitConn(baseInfo.getFromUniqueID(), connection);
                 } else {
-                    work(baseInfo);
+
+                    work(baseInfo, requestPool.getAndRemove(baseInfo));
                 }
             }
             release();
@@ -125,7 +125,7 @@ public abstract class CustomThread extends Thread implements Releasable {
     }
 
 
-    protected abstract void work(BaseInfo info);
+    protected abstract void work(BaseInfo info, BaseInfoReply defaultListener);
 
     @Override
     public final void release() {

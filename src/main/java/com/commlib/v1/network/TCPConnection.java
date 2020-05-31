@@ -8,6 +8,7 @@ import com.commlib.v1.network.utils.Util;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.HashSet;
@@ -26,6 +27,7 @@ public class TCPConnection {
     final BlockingQueue<byte[]> inputQueue;
     final String host;
     private final int hashCode;
+    private final int ipAddr;
     private final byte[] hashBytes;
 
     TCPConnection(int hash, Socket socket, BlockingQueue<byte[]> inputQueue) {
@@ -51,12 +53,19 @@ public class TCPConnection {
 
         this.inputQueue = inputQueue;
         log.info("Connection with host: %s established", host);
+
+        byte[] addr = socket.getInetAddress().getAddress();
+        ipAddr = ((addr[0] & 0xFF) << 24) | ((addr[1] & 0xFF) << 16) | ((addr[2] & 0xFF) << 8) | ((addr[3] & 0xFF));
+
     }
 
     public InetAddress getAddress() {
         return socket.getInetAddress();
     }
 
+    public int getAddressAsInt() {
+        return ipAddr;
+    }
 
     public void send(byte[] data) {
         try {

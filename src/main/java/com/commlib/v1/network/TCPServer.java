@@ -28,9 +28,16 @@ public class TCPServer {
     }
 
     private synchronized void establishConn(Socket socket) {
+        establishConn(null, socket);
+    }
+
+    private synchronized void establishConn(String uniqueID, Socket socket) {
         BlockingQueue<byte[]> inputQueue = new LinkedBlockingQueue<>();
         TCPConnection tcpConnection = new TCPConnection(count.incrementAndGet(), socket, inputQueue);
         connectionPool.submitConn(tcpConnection);
+        if (uniqueID != null) {
+            connectionPool.submitConn(uniqueID, tcpConnection);
+        }
         stageArea.register(inputQueue);
     }
 
@@ -91,14 +98,18 @@ public class TCPServer {
             synchronized (in) {
                 if (!in.isEmpty()) {
                     in.forEach(o -> {
+                        String uniqueID = o.uniqueID;
                         String host = o.host;
                         int port = o.port;
 
-                        try {
-                            Socket socket = new Socket(host, port);
-                            establishConn(socket);
-                        } catch (IOException e) {
-                            e.printStackTrace();
+                        TCPConnection connection = connectionPool.findConnectionBasedOnIP(host);
+                        if (connection == null) {
+                            try {
+                                Socket socket = new Socket(host, port);
+                                establishConn(uniqueID, socket);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
                         }
                     });
                     in.clear();
@@ -115,8 +126,12 @@ public class TCPServer {
     }
 
     public void makeConnectionWith(String host, int port) {
+        this.makeConnectionWith(host, host, port);
+    }
 
-        HP object = new HP(host, port);
+    public void makeConnectionWith(String uniqueID, String host, int port) {
+
+        HP object = new HP(uniqueID, host, port);
         synchronized (in) {
             in.add(object);
             in.notifyAll();
@@ -124,10 +139,12 @@ public class TCPServer {
     }
 
     private class HP {
+        final String uniqueID;
         final String host;
         final int port;
 
-        public HP(String host, int port) {
+        public HP(String uniqueID, String host, int port) {
+            this.uniqueID = uniqueID;
             this.host = host;
             this.port = port;
         }
