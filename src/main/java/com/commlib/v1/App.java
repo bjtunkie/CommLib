@@ -1,35 +1,13 @@
 package com.commlib.v1;
 
-import com.commlib.v1.serializer.ComplexObject;
-import com.commlib.v1.serializer.LWSerializerEngine;
-import com.commlib.v1.serializer.TestObject;
 
-import java.io.DataInputStream;
-import java.lang.reflect.Field;
 import java.util.function.Function;
 
 public class App {
 
     public static void main(String... args) {
-//        StagingArea stagingArea = new InternalStageArea(new ConnectionPool(), new DefaultCustomThreadFactory(), new Util());
-//        TCPServer tcpServer = TCPServer.instance;
-//        tcpServer.start(stagingArea);
 
-        TestObject testObject = new TestObject();
-        testObject.setVariable(11);
 
-        Field[] fields = ComplexObject.class.getDeclaredFields();
-        for (Field field : fields) {
-            System.out.println(field.getType().toString());
-        }
-
-        String string;
-
-//        LWSerializerEngine lwSerializerEngine = new LWSerializerEngine();
-//        byte[] data = lwSerializerEngine.serialize(testObject);
-//
-//        TestObject newObject = lwSerializerEngine.deSerialize(data, TestObject.class);
-//        System.out.println(newObject.getVariable());
 
     }
 

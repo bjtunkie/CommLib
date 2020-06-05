@@ -5,30 +5,19 @@ plugins {
     id 'maven-publish'
 }
 
-group = 'com.commlib'
-version = '0.10'
+group = 'com.chat'
+version = '0.1'
 sourceCompatibility = '11'
 targetCompatibility = '11'
 
 repositories {
     mavenCentral()
+    mavenLocal()
     maven {
         def repoUrl = "${buildDir}/repos"
         url = version.endsWith('SNAPSHOT') ? "${repoUrl}/snapshots" : "${repoUrl}/releases"
     }
 }
-//
-//idea {
-//    project {
-//        settings {
-//            ipr.withXml { xmlFile ->
-//                xmlFile.asNode().component.find { it.@name == 'ProjectRootManager' }['output'][0].replaceNode {
-//                    output(url: "file://\$PROJECT_DIR\$/build")
-//                }
-//            }
-//        }
-//    }
-//}
 
 
 publishing {
@@ -45,8 +34,7 @@ publishing {
 
 
 dependencies {
-}
+    implementation 'com.google.code.gson:gson:2.8.2'
+    implementation 'com.lib:chef:0.1'
 
-test {
-    useJUnitPlatform()
 }

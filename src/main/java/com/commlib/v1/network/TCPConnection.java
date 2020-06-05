@@ -1,42 +1,29 @@
 package com.commlib.v1.network;
 
-import com.commlib.v1.exception.UniqueIDAlreadyExistsException;
+import com.commlib.v1.utils.MarkableReference;
 import com.commlib.v1.log.Log;
 import com.commlib.v1.log.LogFactory;
-import com.commlib.v1.network.utils.Util;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 
 public class TCPConnection {
-    static final Set<Integer> hashCodes = new HashSet<>();
+    static final int TIME_TO_LIVE = 1000 * 60 * 2; // 2 minutes to live.
     private final Log log = LogFactory.create(TCPConnection.class);
     private InputStream inputStream;
     private OutputStream outputStream;
     private final Socket socket;
-    private final Thread inThread;
     private final byte[] buffer = new byte[NetworkConstants.BUFFER_SIZE];
 
-    final BlockingQueue<byte[]> inputQueue;
-    final String host;
-    private final int hashCode;
-    private final int ipAddr;
-    private final byte[] hashBytes;
+    private String associatedUniqueID;
 
-    TCPConnection(int hash, Socket socket, BlockingQueue<byte[]> inputQueue) {
-        if (hashCodes.contains(hash)) throw new UniqueIDAlreadyExistsException();
-        else hashCodes.add(hash);
-        this.hashCode = hash;
-        this.hashBytes = Util.intToByteArray(hash);
+    private volatile boolean running = false;
+
+    public TCPConnection(Socket socket) {
         this.socket = socket;
-        this.host = getAddress().getHostName();
         try {
             inputStream = socket.getInputStream();
         } catch (IOException e) {
@@ -48,14 +35,9 @@ public class TCPConnection {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        inThread = new Thread(this::receive, "Connection-" + hashCode);
-        inThread.start();
 
-        this.inputQueue = inputQueue;
-        log.info("Connection with host: %s established", host);
+        log.info("Connection with host: %s established", getAddress().getHostName());
 
-        byte[] addr = socket.getInetAddress().getAddress();
-        ipAddr = ((addr[0] & 0xFF) << 24) | ((addr[1] & 0xFF) << 16) | ((addr[2] & 0xFF) << 8) | ((addr[3] & 0xFF));
 
     }
 
@@ -63,9 +45,6 @@ public class TCPConnection {
         return socket.getInetAddress();
     }
 
-    public int getAddressAsInt() {
-        return ipAddr;
-    }
 
     public void send(byte[] data) {
         try {
@@ -76,34 +55,42 @@ public class TCPConnection {
         }
     }
 
-
-    private void receive() {
-        while (true) {
-            try {
+    public void receive(final MarkableReference<byte[]> in) {
+        running = true;
+        try {
+            while (!in.isMarked()) {
                 int count = inputStream.read(buffer);
                 if (count > 0) {
-                    log.debug("Received input from " + host);
-                    byte[] data = new byte[count + 4];
+                    log.debug("Received input from " + getAddress().getHostName());
+
+                    byte[] data = new byte[count];
                     System.arraycopy(buffer, 0, data, 0, count);
-
-                    /**
-                     * Temp logic
-                     */
-                    System.arraycopy(hashBytes, 0, data, count, 4);
-
-                    inputQueue.put(data);
+                    in.setReference(data, true);
 
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
-                /**
-                 * Socket disconnected.
-                 */
-                break;
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
+        } catch (IOException e) {
+            e.printStackTrace();
+            /**
+             * Socket disconnected.
+             */
+            close();
+        } finally {
+            running = false;
         }
+
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public boolean isOpen() {
+        return socket.isConnected();
+    }
+
+    public String getAssociatedUniqueID() {
+        return associatedUniqueID;
     }
 
     public void close() {
@@ -119,15 +106,7 @@ public class TCPConnection {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TCPConnection that = (TCPConnection) o;
-        return hashCode == that.hashCode;
+        return hashCode() == that.hashCode();
     }
 
-    private byte[] hashBytes() {
-        return this.hashBytes;
-    }
-
-    @Override
-    public int hashCode() {
-        return hashCode;
-    }
 }

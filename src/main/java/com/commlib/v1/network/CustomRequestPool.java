@@ -1,19 +1,24 @@
 package com.commlib.v1.network;
 
-import com.commlib.v1.comm.BaseInfo;
-import com.commlib.v1.comm.BaseInfoReply;
+import com.commlib.specs.Info;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public class CustomRequestPool implements RequestPool {
 
-    private final Map<BaseInfo, BaseInfoReply> requests = new ConcurrentHashMap<>();
-    private final Thread thread = new Thread(this::analyze);
+    private final Map<Info, Function<Info, Boolean>> requests;
+    private final Collection<Listener> listeners;
+    private final Thread thread;
 
     public CustomRequestPool() {
-
+        requests = new ConcurrentHashMap<>();
+        listeners = new HashSet<>();
+        thread = new Thread(this::analyze);
         thread.start();
     }
 
@@ -21,9 +26,9 @@ public class CustomRequestPool implements RequestPool {
         while (true) {
 
             long now = System.currentTimeMillis();
-            Iterator<Map.Entry<BaseInfo, BaseInfoReply>> it = requests.entrySet().iterator();
+            Iterator<Map.Entry<Info, Function<Info, Boolean>>> it = requests.entrySet().iterator();
             it.forEachRemaining(entry -> {
-                long duration = now - entry.getKey().getTimestamp();
+                long duration = now - entry.getKey().timestamp();
                 if (duration > TIME_TO_LIVE) {
                     it.remove();
                 }
@@ -38,12 +43,29 @@ public class CustomRequestPool implements RequestPool {
     }
 
     @Override
-    public void insert(BaseInfo info, BaseInfoReply reply) {
-        requests.put(info, reply);
+    public void register(Listener listener) {
+        synchronized (listeners) {
+            listeners.add(listener);
+        }
     }
 
     @Override
-    public BaseInfoReply getAndRemove(BaseInfo info) {
-        return requests.remove(info);
+    public <T extends Info> void insert(Info hash, Function<T, Boolean> reply) {
+        requests.put(hash, (Function<Info, Boolean>) reply);
     }
+
+    @Override
+    public void execute(Info response) {
+
+        Function<Info, Boolean> reply = requests.remove(response);
+        if (reply == null || !reply.apply(response)) {
+            listeners
+                    .parallelStream()
+                    .forEach(x -> x.onResponse(response));
+
+        }
+
+
+    }
+
 }

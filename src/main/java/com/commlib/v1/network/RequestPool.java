@@ -1,24 +1,19 @@
 package com.commlib.v1.network;
 
-import com.commlib.v1.comm.BaseInfo;
-import com.commlib.v1.comm.BaseInfoReply;
+import com.commlib.specs.Info;
+
+import java.util.function.Function;
 
 public interface RequestPool {
-    RequestPool defaultRequestPool = new RequestPool() {
-        @Override
-        public void insert(BaseInfo info, BaseInfoReply reply) {
-
-        }
-
-        @Override
-        public BaseInfoReply getAndRemove(BaseInfo info) {
-            return null;
-        }
-    };
     int TIME_TO_LIVE = 5000; // In milliseconds
 
-    void insert(BaseInfo info, BaseInfoReply reply);
+    <T extends Info> void insert(Info hash, Function<T, Boolean> reply);
 
-    BaseInfoReply getAndRemove(BaseInfo info);
+    void execute(Info reply);
 
+    void register(Listener listener);
+
+    interface Listener {
+        void onResponse(Info o);
+    }
 }
