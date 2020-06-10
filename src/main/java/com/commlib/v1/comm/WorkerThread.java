@@ -1,23 +1,20 @@
 package com.commlib.v1.comm;
 
-import com.commlib.specs.Info;
-import com.commlib.specs.Util;
+import com.chat.EasyChef;
+import com.commlib.proto.Info;
+import com.commlib.proto.RequestPool;
+import com.commlib.proto.Util;
 import com.commlib.v1.exception.UniqueIDAlreadyExistsException;
-import com.commlib.v1.network.ConnectionPool;
-import com.commlib.v1.network.RequestPool;
-import com.commlib.v1.network.TCPConnection;
-import com.commlib.v1.utils.MarkableReference;
-import com.lib.Chef;
-import com.lib.EasyChef;
+import com.commlib.v1.utils.HandshakeInfo;
 
 import java.io.IOException;
 import java.net.Socket;
 import java.util.*;
 import java.util.function.Function;
 
-public abstract class WorkerThread extends Thread implements Releasable, Util {
+public abstract class WorkerThread extends Thread implements Util {
     private static final Set<Integer> hashCodes = new HashSet<>();
-    private static final Chef chef = new EasyChef();
+    private static final EasyChef chef = new EasyChef();
     private static final byte TASK_RECEIVE = 1;
     private static final byte TASK_SEND = 2;
     private static final byte TASK_CONNECT = 3;
@@ -29,7 +26,7 @@ public abstract class WorkerThread extends Thread implements Releasable, Util {
 
     private final ConnectionPool connectionPool;
     private final RequestPool requestPool;
-    private byte taskID;
+    private byte taskID = Byte.MIN_VALUE;
 
     public <T extends WorkerThread> WorkerThread(int hash, ThreadPool<T> factory) {
         super("CustomWorkerThread-" + hash);
@@ -56,12 +53,11 @@ public abstract class WorkerThread extends Thread implements Releasable, Util {
 
     }
 
-
-    public final void assignInMessageConnection(TCPConnection conn) {
-
+    public final void readInputFromConnection(byte[] input, TCPConnection conn) {
         synchronized (lock) {
             taskID = TASK_RECEIVE;
             params.clear();
+            params.add(input);
             params.add(conn);
             lock.notifyAll();
         }
@@ -79,74 +75,97 @@ public abstract class WorkerThread extends Thread implements Releasable, Util {
         }
     }
 
-    private void createConnection(String uniqueID, String host, int port) {
-
-        Collection<TCPConnection> x = connectionPool.findConnectionBasedOn(uniqueID);
-        if (x.isEmpty()) {
-            try {
-                Socket socket = new Socket(host, port);
-                TCPConnection connection = new TCPConnection(socket);
-                x.add(connection);
-                connectionPool.addConnection(connection);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     @Override
     public final void run() {
+        final int offset = 24;
 
         while (true) {
             synchronized (lock) {
-                try {
-                    lock.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                if (taskID == Byte.MIN_VALUE) {
+                    try {
+                        lock.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
             Iterator<Object> in = params.iterator();
             switch (taskID) {
-                case TASK_CONNECT:
-                    String uniqueId = (String) in.next();
+                case TASK_CONNECT: {
+                    String uniqueID = (String) in.next();
                     String host = (String) in.next();
                     int port = (int) in.next();
-                    makeConnection(uniqueId, host, port);
-                    break;
-                case TASK_RECEIVE:
-                    readMessage((TCPConnection) in.next());
-                    break;
+                    Collection<TCPConnection> x = connectionPool.findConnectionBasedOn(uniqueID);
+                    if (x.isEmpty()) {
+                        try {
+                            Socket socket = new Socket(host, port);
+                            TCPConnection connection = new TCPConnection(socket, factory);
+                            x.add(connection);
+                            connectionPool.addConnection(connection);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
 
+                    break;
+                }
+                case TASK_RECEIVE: {
+                    byte[] data = (byte[]) in.next();
+                    TCPConnection conn = (TCPConnection) in.next();
+                    int tCode = byteArrayToInt(data, 0);
+                    int lengthOfData = byteArrayToInt(data, 20);
+                    String uniqueID = new String(data, 4, 16);
+
+                    if (tCode == HandshakeInfo.CODE) {
+                        HandshakeInfo info = chef.deSerialize(data, HandshakeInfo.class, offset, lengthOfData);
+                        ConnectionPool c = factory.getConnectionPool();
+                        c.submitConn(info.getSrcUniqueID(), conn);
+
+                        /**
+                         * Entry into dB.
+                         * Send Response if any
+                         */
+                    }
+                    work(data, tCode, uniqueID, lengthOfData);
+                    break;
+                }
                 case TASK_SEND:
                     sendMessage((Info) in.next());
                     break;
             }
-            params.clear();
+
             release();
 
         }
 
     }
 
-    private void readMessage(TCPConnection connection) {
-        MarkableReference<byte[]> input = new MarkableReference<>(false);
-        connection.receive(input);
-        work(input.getReference(), this);
-    }
-
     private void sendMessage(Info outMessage) {
-        byte[] out = chef.serialize(outMessage, 5);
+        byte[] uniqueBytes = outMessage.uniqueID().getBytes();
+        int tCode = outMessage.transmitCode();
+
+        assert uniqueBytes.length <= 16;
+
+        byte[] out = chef.serialize(outMessage, 24);
+        int x = out.length - 24;
+
+        System.arraycopy(uniqueBytes, 0, out, 4, 16);
+        intToByteArray(tCode, out, 0);
+        intToByteArray(x, out, 20);
+
         Collection<TCPConnection> connections = connectionPool.findConnectionBasedOn(outMessage.uniqueID());
         connections.forEach(conn -> {
             conn.send(out);
         });
-
     }
 
-    protected abstract <T extends WorkerThread> void work(byte[] input, T thread);
+    protected abstract void work(byte[] input, int transmitCode, String uniqueID, int lengthOfData);
 
-    @Override
     public final void release() {
+        synchronized (lock) {
+            params.clear();
+            taskID = Byte.MIN_VALUE;
+        }
         factory.putBack(this);
     }
 

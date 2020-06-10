@@ -1,11 +1,11 @@
-package com.commlib.v1.network;
+package com.commlib.v1.comm;
 
 import java.util.*;
 import java.util.function.Predicate;
 
-public class ConnectionPool {
+public final class ConnectionPool {
 
-    public ConnectionPool() {
+    ConnectionPool() {
     }
 
     private final Collection<TCPConnection> connections = new HashSet<>();

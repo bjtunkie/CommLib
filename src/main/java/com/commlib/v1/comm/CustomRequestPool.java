@@ -1,6 +1,7 @@
-package com.commlib.v1.network;
+package com.commlib.v1.comm;
 
-import com.commlib.specs.Info;
+import com.commlib.proto.Info;
+import com.commlib.proto.RequestPool;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -9,13 +10,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-public class CustomRequestPool implements RequestPool {
+public final class CustomRequestPool implements RequestPool {
 
     private final Map<Info, Function<Info, Boolean>> requests;
     private final Collection<Listener> listeners;
     private final Thread thread;
 
-    public CustomRequestPool() {
+    CustomRequestPool() {
         requests = new ConcurrentHashMap<>();
         listeners = new HashSet<>();
         thread = new Thread(this::analyze);
@@ -51,7 +52,8 @@ public class CustomRequestPool implements RequestPool {
 
     @Override
     public <T extends Info> void insert(Info hash, Function<T, Boolean> reply) {
-        requests.put(hash, (Function<Info, Boolean>) reply);
+        if (reply != null)
+            requests.put(hash, (Function<Info, Boolean>) reply);
     }
 
     @Override

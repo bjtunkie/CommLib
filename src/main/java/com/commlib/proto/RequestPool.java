@@ -1,6 +1,4 @@
-package com.commlib.v1.network;
-
-import com.commlib.specs.Info;
+package com.commlib.proto;
 
 import java.util.function.Function;
 

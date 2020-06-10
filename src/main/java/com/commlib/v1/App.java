@@ -1,6 +1,9 @@
 package com.commlib.v1;
 
 
+import com.commlib.v1.comm.CommChannel;
+import com.commlib.v1.comm.WorkerThread;
+
 import java.util.function.Function;
 
 public class App {
@@ -8,6 +11,7 @@ public class App {
     public static void main(String... args) {
 
 
+        CommChannel.instantiate(WorkerThread.class, null, true);
 
     }
 

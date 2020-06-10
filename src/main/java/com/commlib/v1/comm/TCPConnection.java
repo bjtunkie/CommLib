@@ -1,6 +1,5 @@
-package com.commlib.v1.network;
+package com.commlib.v1.comm;
 
-import com.commlib.v1.utils.MarkableReference;
 import com.commlib.v1.log.Log;
 import com.commlib.v1.log.LogFactory;
 
@@ -13,31 +12,42 @@ import java.net.Socket;
 public class TCPConnection {
     static final int TIME_TO_LIVE = 1000 * 60 * 2; // 2 minutes to live.
     private final Log log = LogFactory.create(TCPConnection.class);
-    private InputStream inputStream;
-    private OutputStream outputStream;
+    private final InputStream inputStream;
+    private final OutputStream outputStream;
     private final Socket socket;
-    private final byte[] buffer = new byte[NetworkConstants.BUFFER_SIZE];
+    private final ThreadPool<? extends WorkerThread> tFactory;
+    private final Thread thread;
+    private final byte[] buffer = new byte[Constant.BUFFER_SIZE];
 
     private String associatedUniqueID;
 
-    private volatile boolean running = false;
 
-    public TCPConnection(Socket socket) {
+    public <T extends WorkerThread> TCPConnection(Socket socket, ThreadPool<T> threadFactory) {
+        this("", socket, threadFactory);
+    }
+
+    public <T extends WorkerThread> TCPConnection(String uniqueID, Socket socket, ThreadPool<T> threadFactory) {
         this.socket = socket;
+        InputStream is;
+        OutputStream os;
         try {
-            inputStream = socket.getInputStream();
+            is = socket.getInputStream();
+            os = socket.getOutputStream();
         } catch (IOException e) {
             e.printStackTrace();
+            is = null;
+            os = null;
+            close();
         }
 
-        try {
-            outputStream = socket.getOutputStream();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        inputStream = is;
+        outputStream = os;
 
         log.info("Connection with host: %s established", getAddress().getHostName());
 
+        tFactory = threadFactory;
+        thread = new Thread(this::receive);
+        thread.start();
 
     }
 
@@ -48,6 +58,7 @@ public class TCPConnection {
 
     public void send(byte[] data) {
         try {
+            System.out.println("Sending data: " + new String(data, 24, data.length - 24));
             outputStream.write(data);
             outputStream.flush();
         } catch (IOException e) {
@@ -55,35 +66,30 @@ public class TCPConnection {
         }
     }
 
-    public void receive(final MarkableReference<byte[]> in) {
-        running = true;
+    private void receive() {
+
         try {
-            while (!in.isMarked()) {
+            while (true) {
                 int count = inputStream.read(buffer);
                 if (count > 0) {
                     log.debug("Received input from " + getAddress().getHostName());
 
                     byte[] data = new byte[count];
                     System.arraycopy(buffer, 0, data, 0, count);
-                    in.setReference(data, true);
-
+                    tFactory.getThread().readInputFromConnection(data, this);
                 }
             }
+
         } catch (IOException e) {
             e.printStackTrace();
             /**
              * Socket disconnected.
              */
             close();
-        } finally {
-            running = false;
         }
 
     }
 
-    public boolean isRunning() {
-        return running;
-    }
 
     public boolean isOpen() {
         return socket.isConnected();

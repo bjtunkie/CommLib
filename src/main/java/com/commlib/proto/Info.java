@@ -1,4 +1,4 @@
-package com.commlib.specs;
+package com.commlib.proto;
 
 public interface Info {
     String uniqueID();

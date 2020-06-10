@@ -1,9 +1,8 @@
-package com.commlib.v1.network;
+package com.commlib.v1.comm;
 
-import com.commlib.specs.CommunicationModule;
-import com.commlib.specs.Info;
-import com.commlib.v1.comm.ThreadPool;
-import com.commlib.v1.comm.WorkerThread;
+import com.commlib.proto.CommunicationModule;
+import com.commlib.proto.Info;
+import com.commlib.proto.RequestPool;
 import com.commlib.v1.log.Log;
 import com.commlib.v1.log.LogFactory;
 
@@ -22,11 +21,13 @@ final class StagingArea implements CommunicationModule {
     private final ConnectionPool connectionPool;
     private final Thread TCPServer = new Thread(this::acceptConnections);
     private final Thread TCPMonitory = new Thread(this::monitorConnections);
+    private final boolean localServer;
 
-    <T extends WorkerThread> StagingArea(Class<T> customWorkerThread, ConnectionPool c, RequestPool r) {
+    <T extends WorkerThread> StagingArea(Class<T> customWorkerThread, ConnectionPool c, RequestPool r, boolean enableLocalServer) {
         threadFactory = new ThreadPool<>(c, r, customWorkerThread);
         requestPool = r;
         connectionPool = c;
+        localServer = enableLocalServer;
         TCPServer.start();
         TCPMonitory.start();
     }
@@ -53,46 +54,24 @@ final class StagingArea implements CommunicationModule {
     }
 
 
-    private static final int FIVE_MINUTES = 1000 * 60 * 5;
-
-    private void monitorConnection(TCPConnection conn) {
-        synchronized (conn) {
-            if (!conn.isRunning()) {
-                threadFactory
-                        .getThread()
-                        .assignInMessageConnection(conn);
-            }
-        }
-
-    }
-
     private void monitorConnections() {
 
-        int x = 0;
         while (true) {
             try {
-                Thread.sleep(x += 5000);
+                Thread.sleep(Constant.FIVE_MINUTES);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            connectionPool.removeClosedConnections();
 
-            if (x > FIVE_MINUTES) {
-                connectionPool.removeClosedConnections();
-                x = 0;
-            }
-            connectionPool
-                    .getConnections()
-                    .parallelStream()
-                    .filter(conn -> conn.isOpen() && !conn.isRunning())
-                    .forEach(this::monitorConnection);
         }
     }
 
     private void acceptConnections() {
+
         final String host = "0.0.0.0";
         final int port = 3004;
-
-        while (true) {
+        while (localServer) {
             try {
                 ServerSocket serverSocket = new ServerSocket();
                 serverSocket.bind(new InetSocketAddress(host, port));
@@ -100,9 +79,8 @@ final class StagingArea implements CommunicationModule {
 
                 while (true) {
                     Socket socket = serverSocket.accept();
-                    TCPConnection conn = new TCPConnection(socket);
+                    TCPConnection conn = new TCPConnection(socket, threadFactory);
                     connectionPool.addConnection(conn);
-                    monitorConnection(conn);
 
                 }
             } catch (IOException e) {

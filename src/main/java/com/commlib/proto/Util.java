@@ -1,6 +1,4 @@
-package com.commlib.specs;
-
-import com.commlib.v1.network.TCPConnection;
+package com.commlib.proto;
 
 public interface Util {
 
@@ -11,19 +9,22 @@ public interface Util {
      ***/
 
     /****
-    public TCPConnection findConnectionBasedOnIP(String ip) {
-        // Parse IP parts into an int array
-        byte[] addr = new byte[4];
-        String[] parts = ip.split("\\.");
+     public TCPConnection findConnectionBasedOnIP(String ip) {
+     // Parse IP parts into an int array
+     byte[] addr = new byte[4];
+     String[] parts = ip.split("\\.");
 
-        for (int i = 0; i < 4; i++) {
-            addr[i] = (byte) Integer.parseInt(parts[i]);
-        }
-        int ipAddr = ((addr[0] & 0xFF) << 24) | ((addr[1] & 0xFF) << 16) | ((addr[2] & 0xFF) << 8) | ((addr[3] & 0xFF));
-        return findConnectionBasedOnIP(ipAddr);
+     for (int i = 0; i < 4; i++) {
+     addr[i] = (byte) Integer.parseInt(parts[i]);
+     }
+     int ipAddr = ((addr[0] & 0xFF) << 24) | ((addr[1] & 0xFF) << 16) | ((addr[2] & 0xFF) << 8) | ((addr[3] & 0xFF));
+     return findConnectionBasedOnIP(ipAddr);
+     }
+     ****/
+
+    default short byteArrayToShort(byte[] bytes, int offset) {
+        return (short) (((bytes[offset] & 0xFF) << 8) | (bytes[offset + 1] & 0xFF));
     }
-
-    ****/
 
     default byte[] intToByteArray(int value) {
         return new byte[]{(byte) (value >> 24), (byte) (value >> 16), (byte) (value >> 8), (byte) value};

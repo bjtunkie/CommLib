@@ -20,6 +20,7 @@ repositories {
 }
 
 
+
 publishing {
     publications {
         maven(MavenPublication) {
@@ -35,6 +36,6 @@ publishing {
 
 dependencies {
     implementation 'com.google.code.gson:gson:2.8.2'
-    implementation 'com.lib:chef:0.1'
+    implementation 'com.chat:chef:latest.release'
 
 }

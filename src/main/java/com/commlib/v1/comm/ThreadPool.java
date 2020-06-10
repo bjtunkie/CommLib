@@ -1,7 +1,6 @@
 package com.commlib.v1.comm;
 
-import com.commlib.v1.network.ConnectionPool;
-import com.commlib.v1.network.RequestPool;
+import com.commlib.proto.RequestPool;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Deque;
@@ -21,14 +20,14 @@ public class ThreadPool<T extends WorkerThread> {
     private final RequestPool requestPool;
     private final ConnectionPool connectionPool;
 
-    public ThreadPool(ConnectionPool c, RequestPool r, Class<T> t) {
+    ThreadPool(ConnectionPool c, RequestPool r, Class<T> t) {
         requestPool = r;
         threadClass = t;
         connectionPool = c;
         count = new AtomicInteger(0);
     }
 
-    public T createThread() {
+    T createThread() {
 
         try {
             synchronized (count) {

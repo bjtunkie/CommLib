@@ -1,9 +1,8 @@
-package com.commlib.specs;
+package com.commlib.proto;
 
 import com.commlib.v1.comm.ThreadPool;
 import com.commlib.v1.comm.WorkerThread;
-import com.commlib.v1.network.ConnectionPool;
-import com.commlib.v1.network.RequestPool;
+import com.commlib.v1.comm.ConnectionPool;
 
 public interface CommunicationModule {
 
